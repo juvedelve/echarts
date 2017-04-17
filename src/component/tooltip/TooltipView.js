@@ -61,10 +61,11 @@ define(function (require) {
             this._api = api;
 
             /**
+             * Should be cleaned when render.
              * @private
              * @type {Array.<Array.<Object>>}
              */
-            this._lastDataByCoordSys;
+            this._lastDataByCoordSys = null;
 
             /**
              * @private
@@ -200,11 +201,19 @@ define(function (require) {
                 }
             }
             else if (payload.x != null && payload.y != null) {
+                // FIXME
+                // should wrap dispatchAction like `axisPointer/globalListener` ?
+                api.dispatchAction({
+                    type: 'updateAxisPointer',
+                    x: payload.x,
+                    y: payload.y
+                });
+
                 this._tryShow({
                     offsetX: payload.x,
                     offsetY: payload.y,
                     position: payload.position,
-                    target: api.getZr().handler.findHover(payload.x, payload.y),
+                    target: api.getZr().findHover(payload.x, payload.y).target,
                     event: {}
                 }, dispatchAction);
             }
@@ -577,7 +586,7 @@ define(function (require) {
             }
             else {
                 var pos = refixTooltipPosition(
-                    x, y, content.el, viewWidth, viewHeight, align ? 0 : 20, vAlign ? 0 : 20
+                    x, y, content.el, viewWidth, viewHeight, align ? null : 20, vAlign ? null : 20
                 );
                 x = pos[0];
                 y = pos[1];
@@ -604,13 +613,13 @@ define(function (require) {
             var contentNotChanged = !!lastCoordSys
                 && lastCoordSys.length === dataByCoordSys.length;
 
-            each(lastCoordSys, function (lastItemCoordSys, indexCoordSys) {
+            contentNotChanged && each(lastCoordSys, function (lastItemCoordSys, indexCoordSys) {
                 var lastDataByAxis = lastItemCoordSys.dataByAxis || {};
                 var thisItemCoordSys = dataByCoordSys[indexCoordSys] || {};
                 var thisDataByAxis = thisItemCoordSys.dataByAxis || [];
                 contentNotChanged &= lastDataByAxis.length === thisDataByAxis.length;
 
-                each(lastDataByAxis, function (lastItem, indexAxis) {
+                contentNotChanged && each(lastDataByAxis, function (lastItem, indexAxis) {
                     var thisItem = thisDataByAxis[indexAxis] || {};
                     var lastIndices = lastItem.seriesDataIndices || [];
                     var newIndices = thisItem.seriesDataIndices || [];
@@ -621,7 +630,7 @@ define(function (require) {
                         && lastItem.axisId === thisItem.axisId
                         && lastIndices.length === newIndices.length;
 
-                    each(lastIndices, function (lastIdxItem, j) {
+                    contentNotChanged && each(lastIndices, function (lastIdxItem, j) {
                         var newIdxItem = newIndices[j];
                         contentNotChanged &=
                             lastIdxItem.seriesIndex === newIdxItem.seriesIndex
@@ -692,17 +701,21 @@ define(function (require) {
         var width = el.clientWidth;
         var height = el.clientHeight;
 
-        if (x + width + gapH > viewWidth) {
-            x -= width + gapH;
+        if (gapH != null) {
+            if (x + width + gapH > viewWidth) {
+                x -= width + gapH;
+            }
+            else {
+                x += gapH;
+            }
         }
-        else {
-            x += gapH;
-        }
-        if (y + height + gapV > viewHeight) {
-            y -= height + gapV;
-        }
-        else {
-            y += gapV;
+        if (gapV != null) {
+            if (y + height + gapV > viewHeight) {
+                y -= height + gapV;
+            }
+            else {
+                y += gapV;
+            }
         }
         return [x, y];
     }
