@@ -156,7 +156,7 @@ define(function (require) {
             var hoverItemStyleAccessPath = ['itemStyle', 'emphasis'];
             var labelAccessPath = ['label', 'normal'];
             var hoverLabelAccessPath = ['label', 'emphasis'];
-            var nameMap = {};
+            var nameMap = zrUtil.createHashMap();
 
             zrUtil.each(geo.regions, function (region) {
 
@@ -165,8 +165,8 @@ define(function (require) {
                 // colonies). And it is not appropriate to merge them in geo, which
                 // will make them share the same label and bring trouble in label
                 // location calculation.
-                var regionGroup = nameMap[region.name]
-                    || (nameMap[region.name] = new graphic.Group());
+                var regionGroup = nameMap.get(region.name)
+                    || nameMap.set(region.name, new graphic.Group());
 
                 var compoundPath = new graphic.CompoundPath({
                     shape: {
@@ -198,9 +198,6 @@ define(function (require) {
                         itemStyle.fill = visualColor;
                     }
                 }
-
-                var textStyleModel = labelModel.getModel('textStyle');
-                var hoverTextStyleModel = hoverLabelModel.getModel('textStyle');
 
                 zrUtil.each(region.geometries, function (geometry) {
                     if (geometry.type !== 'polygon') {
@@ -239,28 +236,31 @@ define(function (require) {
                  || (itemLayout && itemLayout.showLabel)
                  ) {
                     var query = data ? dataIdx : region.name;
-                    var formattedStr = mapOrGeoModel.getFormattedLabel(query, 'normal');
-                    var hoverFormattedStr = mapOrGeoModel.getFormattedLabel(query, 'emphasis');
-                    var text = new graphic.Text({
-                        style: {
-                            text: showLabel ? (formattedStr || region.name) : '',
-                            fill: textStyleModel.getTextColor(),
-                            textFont: textStyleModel.getFont(),
-                            textAlign: 'center',
-                            textVerticalAlign: 'middle'
-                        },
-                        hoverStyle: {
-                            text: hoverShowLabel ? (hoverFormattedStr || region.name) : '',
-                            fill: hoverTextStyleModel.getTextColor(),
-                            textFont: hoverTextStyleModel.getFont()
-                        },
+                    var formattedStr;
+                    var hoverFormattedStr;
+                    // Consider dataIdx not found.
+                    if (!data || dataIdx >= 0) {
+                        formattedStr = mapOrGeoModel.getFormattedLabel(query, 'normal');
+                        hoverFormattedStr = mapOrGeoModel.getFormattedLabel(query, 'emphasis');
+                    }
+                    var textEl = new graphic.Text({
                         position: region.center.slice(),
                         scale: [1 / scale[0], 1 / scale[1]],
                         z2: 10,
                         silent: true
                     });
 
-                    regionGroup.add(text);
+                    graphic.setTextStyle(textEl.style, labelModel, {
+                        text: showLabel ? (formattedStr || region.name) : null,
+                        textAlign: 'center',
+                        textVerticalAlign: 'middle'
+                    });
+
+                    graphic.setTextStyle(textEl.hoverStyle = {}, hoverLabelModel, {
+                        text: hoverShowLabel ? hoverFormattedStr : null
+                    }, {forMerge: true});
+
+                    regionGroup.add(textEl);
                 }
 
                 // setItemGraphicEl, setHoverStyle after all polygons and labels

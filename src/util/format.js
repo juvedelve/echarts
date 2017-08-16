@@ -37,29 +37,7 @@ define(function (require) {
         return str;
     };
 
-    /**
-     * Normalize css liked array configuration
-     * e.g.
-     *  3 => [3, 3, 3, 3]
-     *  [4, 2] => [4, 2, 4, 2]
-     *  [4, 3, 2] => [4, 3, 2, 3]
-     * @param {number|Array.<number>} val
-     */
-    formatUtil.normalizeCssArray = function (val) {
-        var len = val.length;
-        if (typeof (val) === 'number') {
-            return [val, val, val, val];
-        }
-        else if (len === 2) {
-            // vertical | horizontal
-            return [val[0], val[1], val[0], val[1]];
-        }
-        else if (len === 3) {
-            // top | horizontal | bottom
-            return [val[0], val[1], val[2], val[1]];
-        }
-        return val;
-    };
+    formatUtil.normalizeCssArray = zrUtil.normalizeCssArray;
 
     var encodeHTML = formatUtil.encodeHTML = function (source) {
         return String(source)
@@ -129,6 +107,18 @@ define(function (require) {
         return tpl;
     };
 
+    /**
+     * @param {string} color
+     * @param {string} [extraCssText]
+     * @return {string}
+     */
+    formatUtil.getTooltipMarker = function (color, extraCssText) {
+        return color
+            ? '<span style="display:inline-block;margin-right:5px;'
+                + 'border-radius:10px;width:9px;height:9px;background-color:'
+                + formatUtil.encodeHTML(color) + ';' + (extraCssText || '') + '"></span>'
+            : '';
+    };
 
     /**
      * @param {string} str
@@ -168,7 +158,7 @@ define(function (require) {
         var s = date['get' + utc + 'Seconds']();
 
         tpl = tpl.replace('MM', s2d(M))
-            .toLowerCase()
+            .replace('M', M)
             .replace('yyyy', y)
             .replace('yy', y % 100)
             .replace('dd', s2d(d))
@@ -193,6 +183,8 @@ define(function (require) {
     };
 
     formatUtil.truncateText = textContain.truncateText;
+
+    formatUtil.getTextRect = textContain.getBoundingRect;
 
     return formatUtil;
 });

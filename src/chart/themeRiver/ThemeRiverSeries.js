@@ -24,7 +24,7 @@ define(function (require) {
 
         /**
          * @readOnly
-         * @type {Object}
+         * @type {module:zrender/core/util#HashMap}
          */
         nameMap: null,
 
@@ -151,17 +151,18 @@ define(function (require) {
 
             var data = this.fixData(filterData || []);
             var nameList = [];
-            var nameMap = this.nameMap = {};
+            var nameMap = this.nameMap = zrUtil.createHashMap();
             var count = 0;
 
             for (var i = 0; i < data.length; ++i) {
                 nameList.push(data[i][DATA_NAME_INDEX]);
-                if (!nameMap[data[i][DATA_NAME_INDEX]]) {
-                    nameMap[data[i][DATA_NAME_INDEX]] = count++;
+                if (!nameMap.get(data[i][DATA_NAME_INDEX])) {
+                    nameMap.set(data[i][DATA_NAME_INDEX], count);
+                    count++;
                 }
             }
 
-            completeDimensions(dimensions, data);
+            dimensions = completeDimensions(dimensions, data);
 
             var list = new List(dimensions, this);
 
@@ -293,10 +294,8 @@ define(function (require) {
                     textAlign: 'right',
                     show: true,
                     position: 'left',
-                    textStyle: {
-                        color: '#000',
-                        fontSize: 11
-                    }
+                    color: '#000',
+                    fontSize: 11
                 },
                 emphasis: {
                     show: true

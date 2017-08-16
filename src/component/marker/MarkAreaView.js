@@ -155,12 +155,9 @@ define(function (require) {
             var seriesData = seriesModel.getData();
 
             var areaGroupMap = this.markerGroupMap;
-            var polygonGroup = areaGroupMap[seriesName];
-            if (!polygonGroup) {
-                polygonGroup = areaGroupMap[seriesName] = {
-                    group: new graphic.Group()
-                };
-            }
+            var polygonGroup = areaGroupMap.get(seriesName)
+                || areaGroupMap.set(seriesName, {group: new graphic.Group()});
+
             this.group.add(polygonGroup.group);
             polygonGroup.__keep = true;
 
@@ -229,27 +226,18 @@ define(function (require) {
                 var defaultValue = areaData.getName(idx) || '';
                 var textColor = color || polygon.style.fill;
 
-                if (labelModel.getShallow('show')) {
-                    graphic.setText(polygon.style, labelModel, textColor);
-                    polygon.style.text = zrUtil.retrieve(
+                graphic.setText(polygon.style, labelModel, textColor);
+                polygon.style.text = labelModel.getShallow('show')
+                    ? zrUtil.retrieve(
                         maModel.getFormattedLabel(idx, 'normal'),
                         defaultValue
-                    );
-                }
-                else {
-                    polygon.style.text = '';
-                }
+                    )
+                    : null;
 
-                if (labelHoverModel.getShallow('show')) {
-                    graphic.setText(polygon.hoverStyle, labelHoverModel, textColor);
-                    polygon.hoverStyle.text = zrUtil.retrieve(
-                        maModel.getFormattedLabel(idx, 'emphasis'),
-                        defaultValue
-                    );
-                }
-                else {
-                    polygon.hoverStyle.text = '';
-                }
+                graphic.setText(polygon.hoverStyle, labelHoverModel, false);
+                polygon.hoverStyle.text = labelHoverModel.getShallow('show')
+                    ? maModel.getFormattedLabel(idx, 'emphasis')
+                    : null;
 
                 graphic.setHoverStyle(polygon, {});
 

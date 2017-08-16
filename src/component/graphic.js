@@ -214,9 +214,9 @@ define(function (require) {
 
             /**
              * @private
-             * @type {Object}
+             * @type {module:zrender/core/util.HashMap}
              */
-            this._elMap = {};
+            this._elMap = zrUtil.createHashMap();
 
             /**
              * @private
@@ -270,15 +270,27 @@ define(function (require) {
             zrUtil.each(elOptionsToUpdate, function (elOption) {
                 var $action = elOption.$action;
                 var id = elOption.id;
-                var existEl = elMap[id];
+                var existEl = elMap.get(id);
                 var parentId = elOption.parentId;
-                var targetElParent = parentId != null ? elMap[parentId] : rootGroup;
+                var targetElParent = parentId != null ? elMap.get(parentId) : rootGroup;
 
-                // In top/bottom mode, textVertical should not be used. And textBaseline
-                // should not be 'alphabetic', which cause inaccurately locating.
-                if (elOption.hv && elOption.hv[1] && elOption.type === 'text') {
-                    elOption.style = zrUtil.defaults({textBaseline: 'middle'}, elOption.style);
-                    elOption.style.textVerticalAlign = null;
+                if (elOption.type === 'text') {
+                    var elOptionStyle = elOption.style;
+
+                    // In top/bottom mode, textVerticalAlign should not be used, which cause
+                    // inaccurately locating.
+                    if (elOption.hv && elOption.hv[1]) {
+                        elOptionStyle.textVerticalAlign = elOptionStyle.textBaseline = null;
+                    }
+
+                    // Compatible with previous setting: both support fill and textFill,
+                    // stroke and textStroke.
+                    !elOptionStyle.hasOwnProperty('textFill') && elOptionStyle.fill && (
+                        elOptionStyle.textFill = elOptionStyle.fill
+                    );
+                    !elOptionStyle.hasOwnProperty('textStroke') && elOptionStyle.stroke && (
+                        elOptionStyle.textStroke = elOptionStyle.stroke
+                    );
                 }
 
                 // Remove unnecessary props to avoid potential problems.
@@ -305,9 +317,10 @@ define(function (require) {
                     removeEl(existEl, elMap);
                 }
 
-                if (elMap[id]) {
-                    elMap[id].__ecGraphicWidth = elOption.width;
-                    elMap[id].__ecGraphicHeight = elOption.height;
+                var el = elMap.get(id);
+                if (el) {
+                    el.__ecGraphicWidth = elOption.width;
+                    el.__ecGraphicHeight = elOption.height;
                 }
             });
         },
@@ -327,7 +340,7 @@ define(function (require) {
             // Bottom-up tranvese all elements (consider ec resize) to locate elements.
             for (var i = elOptions.length - 1; i >= 0; i--) {
                 var elOption = elOptions[i];
-                var el = elMap[elOption.id];
+                var el = elMap.get(elOption.id);
 
                 if (!el) {
                     continue;
@@ -358,10 +371,10 @@ define(function (require) {
          */
         _clear: function () {
             var elMap = this._elMap;
-            zrUtil.each(elMap, function (el) {
+            elMap.each(function (el) {
                 removeEl(el, elMap);
             });
-            this._elMap = {};
+            this._elMap = zrUtil.createHashMap();
         },
 
         /**
@@ -387,7 +400,7 @@ define(function (require) {
 
         var el = new Clz(elOption);
         targetElParent.add(el);
-        elMap[id] = el;
+        elMap.set(id, el);
         el.__ecGraphicId = id;
     }
 
@@ -397,7 +410,7 @@ define(function (require) {
             existEl.type === 'group' && existEl.traverse(function (el) {
                 removeEl(el, elMap);
             });
-            delete elMap[existEl.__ecGraphicId];
+            elMap.removeKey(existEl.__ecGraphicId);
             existElParent.remove(existEl);
         }
     }

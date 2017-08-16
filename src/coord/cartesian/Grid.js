@@ -31,7 +31,7 @@ define(function(require, factory) {
     function getLabelUnionRect(axis) {
         var axisModel = axis.model;
         var labels = axisModel.getFormattedLabels();
-        var textStyleModel = axisModel.getModel('axisLabel.textStyle');
+        var axisLabelModel = axisModel.getModel('axisLabel');
         var rect;
         var step = 1;
         var labelCount = labels.length;
@@ -41,7 +41,7 @@ define(function(require, factory) {
         }
         for (var i = 0; i < labelCount; i += step) {
             if (!axis.isLabelIgnored(i)) {
-                var singleRect = textStyleModel.getTextRect(labels[i]);
+                var singleRect = axisLabelModel.getTextRect(labels[i]);
                 // FIXME consider label rotate
                 rect ? rect.union(singleRect) : (rect = singleRect);
             }
@@ -95,38 +95,17 @@ define(function(require, factory) {
 
         this._updateScale(ecModel, this.model);
 
-        function ifAxisCanNotOnZero(otherAxisDim) {
-            var axes = axesMap[otherAxisDim];
-            for (var idx in axes) {
-                if (axes.hasOwnProperty(idx)) {
-                    var axis = axes[idx];
-                    if (axis && (axis.type === 'category' || !ifAxisCrossZero(axis))) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
         each(axesMap.x, function (xAxis) {
             niceScaleExtent(xAxis.scale, xAxis.model);
         });
         each(axesMap.y, function (yAxis) {
             niceScaleExtent(yAxis.scale, yAxis.model);
         });
-        // Fix configuration
         each(axesMap.x, function (xAxis) {
-            // onZero can not be enabled in these two situations
-            // 1. When any other axis is a category axis
-            // 2. When any other axis not across 0 point
-            if (ifAxisCanNotOnZero('y')) {
-                xAxis.onZero = false;
-            }
+            fixAxisOnZero(axesMap, 'y', xAxis);
         });
         each(axesMap.y, function (yAxis) {
-            if (ifAxisCanNotOnZero('x')) {
-                yAxis.onZero = false;
-            }
+            fixAxisOnZero(axesMap, 'x', yAxis);
         });
 
         // Resize again if containLabel is enabled
@@ -134,12 +113,53 @@ define(function(require, factory) {
         this.resize(this.model, api);
     };
 
+    function fixAxisOnZero(axesMap, otherAxisDim, axis) {
+        // onZero can not be enabled in these two situations:
+        // 1. When any other axis is a category axis.
+        // 2. When no axis is cross 0 point.
+        var axes = axesMap[otherAxisDim];
+
+        if (!axis.onZero) {
+            return;
+        }
+
+        var onZeroAxisIndex = axis.onZeroAxisIndex;
+
+        // If target axis is specified.
+        if (onZeroAxisIndex != null) {
+            var otherAxis = axes[onZeroAxisIndex];
+            if (otherAxis && canNotOnZeroToAxis(otherAxis)) {
+                axis.onZero = false;
+            }
+            return;
+        }
+
+        for (var idx in axes) {
+            if (axes.hasOwnProperty(idx)) {
+                var otherAxis = axes[idx];
+                if (otherAxis && !canNotOnZeroToAxis(otherAxis)) {
+                    onZeroAxisIndex = +idx;
+                    break;
+                }
+            }
+        }
+
+        if (onZeroAxisIndex == null) {
+            axis.onZero = false;
+        }
+        axis.onZeroAxisIndex = onZeroAxisIndex;
+    }
+
+    function canNotOnZeroToAxis(axis) {
+        return axis.type === 'category' || axis.type === 'time' || !ifAxisCrossZero(axis);
+    }
+
     /**
      * Resize the grid
      * @param {module:echarts/coord/cartesian/GridModel} gridModel
      * @param {module:echarts/ExtensionAPI} api
      */
-    gridProto.resize = function (gridModel, api) {
+    gridProto.resize = function (gridModel, api, ignoreContainLabel) {
 
         var gridRect = layout.getLayoutRect(
             gridModel.getBoxLayoutParams(), {
@@ -154,7 +174,7 @@ define(function(require, factory) {
         adjustAxes();
 
         // Minus label size
-        if (gridModel.get('containLabel')) {
+        if (!ignoreContainLabel && gridModel.get('containLabel')) {
             each(axesList, function (axis) {
                 if (!axis.model.get('axisLabel.inside')) {
                     var labelUnionRect = getLabelUnionRect(axis);
@@ -188,7 +208,7 @@ define(function(require, factory) {
 
     /**
      * @param {string} axisType
-     * @param {ndumber} [axisIndex]
+     * @param {number} [axisIndex]
      */
     gridProto.getAxis = function (axisType, axisIndex) {
         var axesMapOnDim = this._axesMap[axisType];
@@ -415,6 +435,7 @@ define(function(require, factory) {
                 axis.inverse = axisModel.get('inverse');
 
                 axis.onZero = axisModel.get('axisLine.onZero');
+                axis.onZeroAxisIndex = axisModel.get('axisLine.onZeroAxisIndex');
 
                 // Inject axis into axisModel
                 axisModel.axis = axis;
@@ -555,7 +576,9 @@ define(function(require, factory) {
         ecModel.eachComponent('grid', function (gridModel, idx) {
             var grid = new Grid(gridModel, ecModel, api);
             grid.name = 'grid_' + idx;
-            grid.resize(gridModel, api);
+            // dataSampling requires axis extent, so resize
+            // should be performed in create stage.
+            grid.resize(gridModel, api, true);
 
             gridModel.coordinateSystem = grid;
 

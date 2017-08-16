@@ -52,7 +52,9 @@ define(function (require) {
     var TimeScale = IntervalScale.extend({
         type: 'time',
 
-        // Overwrite
+        /**
+         * @override
+         */
         getLabel: function (val) {
             var stepLvl = this._stepLvl;
 
@@ -61,8 +63,10 @@ define(function (require) {
             return formatUtil.formatTime(stepLvl[0], date, this.getSetting('useUTC'));
         },
 
-        // Overwrite
-        niceExtent: function (approxTickNum, fixMin, fixMax) {
+        /**
+         * @override
+         */
+        niceExtent: function (opt) {
             var extent = this._extent;
             // If extent start and end are same, expand them
             if (extent[0] === extent[1]) {
@@ -77,21 +81,23 @@ define(function (require) {
                 extent[0] = extent[1] - ONE_DAY;
             }
 
-            this.niceTicks(approxTickNum);
+            this.niceTicks(opt.splitNumber, opt.minInterval, opt.maxInterval);
 
             // var extent = this._extent;
             var interval = this._interval;
 
-            if (!fixMin) {
+            if (!opt.fixMin) {
                 extent[0] = numberUtil.round(mathFloor(extent[0] / interval) * interval);
             }
-            if (!fixMax) {
+            if (!opt.fixMax) {
                 extent[1] = numberUtil.round(mathCeil(extent[1] / interval) * interval);
             }
         },
 
-        // Overwrite
-        niceTicks: function (approxTickNum) {
+        /**
+         * @override
+         */
+        niceTicks: function (approxTickNum, minInterval, maxInterval) {
             var timezoneOffset = this.getSetting('useUTC')
                 ? 0 : numberUtil.getTimezoneOffset() * 60 * 1000;
             approxTickNum = approxTickNum || 10;
@@ -99,6 +105,14 @@ define(function (require) {
             var extent = this._extent;
             var span = extent[1] - extent[0];
             var approxInterval = span / approxTickNum;
+
+            if (minInterval != null && approxInterval < minInterval) {
+                approxInterval = minInterval;
+            }
+            if (maxInterval != null && approxInterval > maxInterval) {
+                approxInterval = maxInterval;
+            }
+
             var scaleLevelsLen = scaleLevels.length;
             var idx = bisect(scaleLevels, approxInterval, 0, scaleLevelsLen);
 
